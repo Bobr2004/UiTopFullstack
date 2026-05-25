@@ -6,15 +6,9 @@ import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
 import { categoriesRouter } from "./modules/categories/categories.routes.js";
 import { todosRouter } from "./modules/todos/todos.routes.js";
 
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
-
 export const app = express();
 
-app.use(
-  cors({
-    origin: frontendOrigin,
-  }),
-);
+app.use(cors());
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
