@@ -46,30 +46,32 @@ const todoSelection = {
 
 export async function listTodos(categorySlug?: string): Promise<TodoDto[]> {
   if (categorySlug) {
-    return db
+    const rows = await db
       .select(todoSelection)
       .from(todos)
       .innerJoin(categories, eq(todos.categoryId, categories.id))
       .where(eq(categories.slug, categorySlug))
       .orderBy(desc(todos.createdAt))
-      .all()
-      .map(toTodoDto);
+      .all();
+
+    return rows.map(toTodoDto);
   }
 
-  return db
+  const rows = await db
     .select(todoSelection)
     .from(todos)
     .innerJoin(categories, eq(todos.categoryId, categories.id))
     .orderBy(desc(todos.createdAt))
-    .all()
-    .map(toTodoDto);
+    .all();
+
+  return rows.map(toTodoDto);
 }
 
 export async function createTodo(input: {
   text: string;
   categoryId: number;
 }): Promise<TodoDto> {
-  const category = db
+  const category = await db
     .select()
     .from(categories)
     .where(eq(categories.id, input.categoryId))
@@ -79,7 +81,7 @@ export async function createTodo(input: {
     throw new HttpError(404, "Category not found");
   }
 
-  const [{ value: tasksInCategory }] = db
+  const [{ value: tasksInCategory }] = await db
     .select({ value: count() })
     .from(todos)
     .where(eq(todos.categoryId, input.categoryId))
@@ -90,7 +92,7 @@ export async function createTodo(input: {
   }
 
   const now = new Date().toISOString();
-  const [created] = db
+  const [created] = await db
     .insert(todos)
     .values({
       text: input.text,
@@ -111,7 +113,8 @@ export async function updateTodo(
 ): Promise<TodoDto> {
   await getTodoOrThrow(id);
 
-  db.update(todos)
+  await db
+    .update(todos)
     .set({
       completed: input.completed,
       updatedAt: new Date().toISOString(),
@@ -124,11 +127,11 @@ export async function updateTodo(
 
 export async function deleteTodo(id: number): Promise<void> {
   await getTodoOrThrow(id);
-  db.delete(todos).where(eq(todos.id, id)).run();
+  await db.delete(todos).where(eq(todos.id, id)).run();
 }
 
 async function getTodoOrThrow(id: number): Promise<TodoDto> {
-  const row = db
+  const row = await db
     .select(todoSelection)
     .from(todos)
     .innerJoin(categories, eq(todos.categoryId, categories.id))

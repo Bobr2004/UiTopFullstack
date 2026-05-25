@@ -8,18 +8,22 @@ const seedCategories = [
   { name: "Other", slug: "other" },
 ];
 
-export function initDatabase() {
-  rawDb.exec(`
+export async function initDatabase() {
+  await rawDb.execute(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL
-    );
+    )
+  `);
 
+  await rawDb.execute(`
     CREATE INDEX IF NOT EXISTS categories_slug_idx
-      ON categories (slug);
+      ON categories (slug)
+  `);
 
+  await rawDb.execute(`
     CREATE TABLE IF NOT EXISTS todos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       text TEXT NOT NULL,
@@ -28,23 +32,20 @@ export function initDatabase() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
-    );
-
-    CREATE INDEX IF NOT EXISTS todos_category_id_idx
-      ON todos (category_id);
+    )
   `);
 
-  const insertCategory = rawDb.prepare(`
-    INSERT OR IGNORE INTO categories (name, slug, created_at)
-    VALUES (@name, @slug, @createdAt)
+  await rawDb.execute(`
+    CREATE INDEX IF NOT EXISTS todos_category_id_idx
+      ON todos (category_id)
   `);
 
   const createdAt = new Date().toISOString();
-  const transaction = rawDb.transaction(() => {
-    for (const category of seedCategories) {
-      insertCategory.run({ ...category, createdAt });
-    }
-  });
 
-  transaction();
+  for (const category of seedCategories) {
+    await rawDb.execute({
+      sql: "INSERT OR IGNORE INTO categories (name, slug, created_at) VALUES (?, ?, ?)",
+      args: [category.name, category.slug, createdAt],
+    });
+  }
 }

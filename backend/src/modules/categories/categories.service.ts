@@ -4,7 +4,7 @@ import { db } from "../../db/client.js";
 import { categories } from "../../db/schema.js";
 
 export async function listCategories() {
-  return db
+  const rows = await db
     .select({
       id: categories.id,
       name: categories.name,
@@ -14,4 +14,6 @@ export async function listCategories() {
     .from(categories)
     .orderBy(asc(categories.name))
     .all();
+
+  return rows;
 }

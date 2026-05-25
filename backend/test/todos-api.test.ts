@@ -24,14 +24,12 @@ beforeAll(async () => {
   createTodo = todosServiceModule.createTodo;
   listTodos = todosServiceModule.listTodos;
   listCategories = categoriesServiceModule.listCategories;
-  initDbModule.initDatabase();
+  await initDbModule.initDatabase();
 });
 
-beforeEach(() => {
-  rawDb.exec(`
-    DELETE FROM todos;
-    DELETE FROM sqlite_sequence WHERE name = 'todos';
-  `);
+beforeEach(async () => {
+  await rawDb.execute("DELETE FROM todos");
+  await rawDb.execute("DELETE FROM sqlite_sequence WHERE name = 'todos'");
 });
 
 describe("todos API", () => {
