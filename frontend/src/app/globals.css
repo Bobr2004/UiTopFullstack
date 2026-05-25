@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+  --brutal-border-width: 3px;
+  --brutal-border-color: #000000;
+  --brutal-shadow-offset-x: 4px;
+  --brutal-shadow-offset-y: 4px;
+  --brutal-shadow-color: #000000;
+  --brutal-radius: 0px;
+  --brutal-pressed-offset: 2px;
+  --brutal-primary: #ff6b6b;
+  --brutal-secondary: #4ecdc4;
+  --brutal-accent: #ffe66d;
+  --brutal-destructive: #ef476f;
+  --brutal-success: #7fb069;
+  --brutal-bg: #ffffff;
+  --brutal-fg: #000000;
+  --brutal-muted: #f3f4f6;
+  --brutal-ring: #000000;
+}
+
+@utility border-3 {
+  border-width: 3px;
+}
+
+@theme inline {
+  --color-brutal: var(--brutal-border-color);
+  --color-brutal-primary: var(--brutal-primary);
+  --color-brutal-secondary: var(--brutal-secondary);
+  --color-brutal-accent: var(--brutal-accent);
+  --color-brutal-destructive: var(--brutal-destructive);
+  --color-brutal-success: var(--brutal-success);
+  --color-brutal-bg: var(--brutal-bg);
+  --color-brutal-fg: var(--brutal-fg);
+  --color-brutal-muted: var(--brutal-muted);
+  --radius-brutal: var(--brutal-radius);
+  --shadow-brutal: 4px 4px 0px 0px var(--brutal-shadow-color);
+  --shadow-brutal-sm: 2px 2px 0px 0px var(--brutal-shadow-color);
+  --shadow-brutal-lg: 6px 6px 0px 0px var(--brutal-shadow-color);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--brutal-bg);
+    color: var(--brutal-fg);
+  }
+}
