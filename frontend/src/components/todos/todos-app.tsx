@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import { CheckCheck, CheckCircle2, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Alert, Button, Spinner, ToastContainer, type ToastItem } from "@/components/ui";
+import { Alert, Badge, Button, Checkbox, Spinner, ToastContainer, type ToastItem } from "@/components/ui";
 import { getApiErrorMessage } from "@/lib/errors";
 import { queryKeys } from "@/lib/query-keys";
 import { createTodo, deleteTodo, getCategories, getTodos, updateTodo } from "@/lib/todos-api";
@@ -21,7 +21,8 @@ export function TodosApp() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [hiddenTodoIds, setHiddenTodoIds] = useState<Set<number>>(new Set());
   const [pendingRemovalIds, setPendingRemovalIds] = useState<Set<number>>(new Set());
-  const timersRef = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const [selectedTodoIds, setSelectedTodoIds] = useState<Set<number>>(new Set());
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const activeCategory = selectedCategory === ALL_CATEGORIES ? undefined : selectedCategory;
 
@@ -66,6 +67,23 @@ export function TodosApp() {
     () => todos.filter((todo) => !hiddenTodoIds.has(todo.id)).length,
     [hiddenTodoIds, todos],
   );
+  const visibleTodos = useMemo(
+    () => todos.filter((todo) => !hiddenTodoIds.has(todo.id)),
+    [hiddenTodoIds, todos],
+  );
+  const selectableTodoIds = useMemo(
+    () =>
+      visibleTodos
+        .filter((todo) => !pendingRemovalIds.has(todo.id) && !todo.completed)
+        .map((todo) => todo.id),
+    [pendingRemovalIds, visibleTodos],
+  );
+  const selectedVisibleTodoIds = useMemo(
+    () => selectableTodoIds.filter((todoId) => selectedTodoIds.has(todoId)),
+    [selectableTodoIds, selectedTodoIds],
+  );
+  const allVisibleSelectableSelected =
+    selectableTodoIds.length > 0 && selectedVisibleTodoIds.length === selectableTodoIds.length;
 
   function addToast(toast: Omit<ToastItem, "id">, id = crypto.randomUUID()) {
     setToasts((current) => [...current, { ...toast, id }]);
@@ -76,11 +94,11 @@ export function TodosApp() {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }
 
-  function clearTimer(todoId: number) {
-    const timer = timersRef.current.get(todoId);
+  function clearTimer(timerKey: string) {
+    const timer = timersRef.current.get(timerKey);
     if (timer) {
       clearTimeout(timer);
-      timersRef.current.delete(todoId);
+      timersRef.current.delete(timerKey);
     }
   }
 
@@ -98,11 +116,39 @@ export function TodosApp() {
     await createMutation.mutateAsync(input);
   }
 
+  function updateMultipleTodosInCache(todoIds: number[], patch: Partial<Todo>) {
+    const todoIdSet = new Set(todoIds);
+    queryClient.setQueriesData<Todo[]>({ queryKey: ["todos"] }, (current) => {
+      if (!current) {
+        return current;
+      }
+
+      return current.map((todo) => (todoIdSet.has(todo.id) ? { ...todo, ...patch } : todo));
+    });
+  }
+
+  function handleToggleSelected(todoId: number) {
+    setSelectedTodoIds((current) => toggleSetValue(current, todoId));
+  }
+
+  function handleToggleSelectAllVisible() {
+    setSelectedTodoIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelectableSelected) {
+        selectableTodoIds.forEach((todoId) => next.delete(todoId));
+      } else {
+        selectableTodoIds.forEach((todoId) => next.add(todoId));
+      }
+      return next;
+    });
+  }
+
   async function handleCompleteTodo(todo: Todo) {
     if (pendingRemovalIds.has(todo.id)) {
       return;
     }
 
+    setSelectedTodoIds((current) => removeFromSet(current, todo.id));
     setPendingRemovalIds((current) => new Set(current).add(todo.id));
     updateTodoInCache(todo.id, { completed: true });
 
@@ -131,15 +177,16 @@ export function TodosApp() {
       ),
     }, toastId);
 
+    const timerKey = `complete:${todo.id}`;
     const timer = setTimeout(() => {
       void finalizeDelete(todo.id, toastId, false);
     }, UNDO_TIMEOUT_MS);
 
-    timersRef.current.set(todo.id, timer);
+    timersRef.current.set(timerKey, timer);
   }
 
   async function undoComplete(todo: Todo, toastId: string) {
-    clearTimer(todo.id);
+    clearTimer(`complete:${todo.id}`);
     removeToast(toastId);
     setPendingRemovalIds((current) => removeFromSet(current, todo.id));
     updateTodoInCache(todo.id, { completed: false });
@@ -161,6 +208,7 @@ export function TodosApp() {
       return;
     }
 
+    setSelectedTodoIds((current) => removeFromSet(current, todo.id));
     setHiddenTodoIds((current) => new Set(current).add(todo.id));
 
     const toastId = crypto.randomUUID();
@@ -175,21 +223,109 @@ export function TodosApp() {
       ),
     }, toastId);
 
+    const timerKey = `delete:${todo.id}`;
     const timer = setTimeout(() => {
       void finalizeDelete(todo.id, toastId, true);
     }, UNDO_TIMEOUT_MS);
 
-    timersRef.current.set(todo.id, timer);
+    timersRef.current.set(timerKey, timer);
   }
 
   function undoDelete(todoId: number, toastId: string) {
-    clearTimer(todoId);
+    clearTimer(`delete:${todoId}`);
     removeToast(toastId);
     setHiddenTodoIds((current) => removeFromSet(current, todoId));
   }
 
+  async function handleBulkComplete() {
+    if (selectedVisibleTodoIds.length === 0) {
+      return;
+    }
+
+    const selectedIdSet = new Set(selectedVisibleTodoIds);
+    const selectedTodos = todos.filter((todo) => selectedIdSet.has(todo.id));
+    const todoIds = selectedTodos.map((todo) => todo.id);
+
+    setSelectedTodoIds((current) => {
+      const next = new Set(current);
+      todoIds.forEach((todoId) => next.delete(todoId));
+      return next;
+    });
+    setPendingRemovalIds((current) => addManyToSet(current, todoIds));
+    updateMultipleTodosInCache(todoIds, { completed: true });
+
+    const results = await Promise.allSettled(
+      selectedTodos.map((todo) => updateTodo(todo.id, { completed: true })),
+    );
+
+    const failedTodoIds = todoIds.filter((_, index) => results[index]?.status === "rejected");
+    const completedTodos = selectedTodos.filter((_, index) => results[index]?.status === "fulfilled");
+    const completedTodoIds = completedTodos.map((todo) => todo.id);
+
+    if (failedTodoIds.length > 0) {
+      setPendingRemovalIds((current) => removeManyFromSet(current, failedTodoIds));
+      updateMultipleTodosInCache(failedTodoIds, { completed: false });
+      addToast({
+        title: "Some tasks could not be completed",
+        description: `${failedTodoIds.length} task${failedTodoIds.length === 1 ? "" : "s"} stayed unchanged.`,
+        variant: "danger",
+      });
+    }
+
+    if (completedTodoIds.length === 0) {
+      return;
+    }
+
+    const toastId = crypto.randomUUID();
+    addToast({
+      title: `${completedTodoIds.length} task${completedTodoIds.length === 1 ? "" : "s"} marked done`,
+      description: "They will disappear in 5 seconds.",
+      variant: "success",
+      action: (
+        <Button
+          size="sm"
+          type="button"
+          variant="outline"
+          onClick={() => undoBulkComplete(completedTodos, toastId)}
+        >
+          Undo
+        </Button>
+      ),
+    }, toastId);
+
+    const timerKey = `bulk:${toastId}`;
+    const timer = setTimeout(() => {
+      void finalizeBulkDelete(completedTodoIds, toastId);
+    }, UNDO_TIMEOUT_MS);
+
+    timersRef.current.set(timerKey, timer);
+  }
+
+  async function undoBulkComplete(todosToRestore: Todo[], toastId: string) {
+    clearTimer(`bulk:${toastId}`);
+    removeToast(toastId);
+
+    const todoIds = todosToRestore.map((todo) => todo.id);
+    setPendingRemovalIds((current) => removeManyFromSet(current, todoIds));
+    updateMultipleTodosInCache(todoIds, { completed: false });
+
+    const results = await Promise.allSettled(
+      todosToRestore.map((todo) => updateTodo(todo.id, { completed: false })),
+    );
+    const failedTodoIds = todoIds.filter((_, index) => results[index]?.status === "rejected");
+
+    if (failedTodoIds.length > 0) {
+      addToast({
+        title: "Could not undo all tasks",
+        description: `${failedTodoIds.length} task${failedTodoIds.length === 1 ? "" : "s"} may need a refresh.`,
+        variant: "danger",
+      });
+      void queryClient.invalidateQueries({ queryKey: ["todos"] });
+    }
+  }
+
   async function finalizeDelete(todoId: number, toastId: string, wasHidden: boolean) {
-    clearTimer(todoId);
+    clearTimer(wasHidden ? `delete:${todoId}` : `complete:${todoId}`);
     removeToast(toastId);
 
     try {
@@ -209,6 +345,26 @@ export function TodosApp() {
       });
       void queryClient.invalidateQueries({ queryKey: ["todos"] });
     }
+  }
+
+  async function finalizeBulkDelete(todoIds: number[], toastId: string) {
+    clearTimer(`bulk:${toastId}`);
+    removeToast(toastId);
+
+    const results = await Promise.allSettled(todoIds.map((todoId) => deleteTodo(todoId)));
+    const failedTodoIds = todoIds.filter((_, index) => results[index]?.status === "rejected");
+
+    setPendingRemovalIds((current) => removeManyFromSet(current, todoIds));
+
+    if (failedTodoIds.length > 0) {
+      addToast({
+        title: "Could not remove all completed tasks",
+        description: `${failedTodoIds.length} task${failedTodoIds.length === 1 ? "" : "s"} remained in the list.`,
+        variant: "danger",
+      });
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ["todos"] });
   }
 
   return (
@@ -281,6 +437,36 @@ export function TodosApp() {
               />
             </div>
 
+            <div className="flex flex-col gap-3 border-3 border-brutal bg-white p-3 shadow-brutal sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-2 font-black uppercase">
+                  <Checkbox
+                    aria-label="Select all visible tasks"
+                    checked={allVisibleSelectableSelected}
+                    disabled={selectableTodoIds.length === 0}
+                    onCheckedChange={handleToggleSelectAllVisible}
+                  />
+                  <span>Select visible</span>
+                </label>
+                <Badge variant={selectedVisibleTodoIds.length > 0 ? "accent" : "default"}>
+                  {selectedVisibleTodoIds.length} selected
+                </Badge>
+              </div>
+
+              <Button
+                disabled={selectedVisibleTodoIds.length === 0}
+                loading={false}
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  void handleBulkComplete();
+                }}
+              >
+                <CheckCheck className="h-4 w-4 stroke-[3]" />
+                Mark selected done
+              </Button>
+            </div>
+
             {todosQuery.isLoading ? (
               <div className="flex justify-center py-10">
                 <Spinner label="Loading tasks" />
@@ -289,7 +475,9 @@ export function TodosApp() {
               <TodoList
                 hiddenTodoIds={hiddenTodoIds}
                 pendingRemovalIds={pendingRemovalIds}
+                selectedTodoIds={selectedTodoIds}
                 todos={todos}
+                onToggleSelected={handleToggleSelected}
                 onComplete={handleCompleteTodo}
                 onDelete={handleDeleteTodo}
               />
@@ -306,6 +494,28 @@ export function TodosApp() {
 function removeFromSet(set: Set<number>, value: number) {
   const next = new Set(set);
   next.delete(value);
+  return next;
+}
+
+function removeManyFromSet(set: Set<number>, values: number[]) {
+  const next = new Set(set);
+  values.forEach((value) => next.delete(value));
+  return next;
+}
+
+function addManyToSet(set: Set<number>, values: number[]) {
+  const next = new Set(set);
+  values.forEach((value) => next.add(value));
+  return next;
+}
+
+function toggleSetValue(set: Set<number>, value: number) {
+  const next = new Set(set);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
   return next;
 }
 

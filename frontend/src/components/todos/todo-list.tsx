@@ -8,12 +8,16 @@ export function TodoList({
   todos,
   hiddenTodoIds,
   pendingRemovalIds,
+  selectedTodoIds,
+  onToggleSelected,
   onComplete,
   onDelete,
 }: {
   todos: Todo[];
   hiddenTodoIds: Set<number>;
   pendingRemovalIds: Set<number>;
+  selectedTodoIds: Set<number>;
+  onToggleSelected: (todoId: number) => void;
   onComplete: (todo: Todo) => void;
   onDelete: (todo: Todo) => void;
 }) {
@@ -29,7 +33,9 @@ export function TodoList({
         <TodoRow
           key={todo.id}
           todo={todo}
+          isSelected={selectedTodoIds.has(todo.id)}
           isPendingRemoval={pendingRemovalIds.has(todo.id)}
+          onToggleSelected={onToggleSelected}
           onComplete={onComplete}
           onDelete={onDelete}
         />
