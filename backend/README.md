@@ -1,6 +1,12 @@
 # Todo Categories Backend
 
-Node.js + Express + TypeScript API using Drizzle ORM and a local SQLite file.
+Node.js + Express + TypeScript API using Drizzle ORM and Turso (hosted SQLite).
+
+## Deployed
+
+```txt
+https://ui-top-fullstack-bobr2004s-projects.vercel.app/
+```
 
 ## Setup
 
@@ -15,6 +21,8 @@ The API starts on:
 ```txt
 http://localhost:4000
 ```
+
+> On the `deployed-version` branch the app runs as a Vercel Serverless Function via `api/index.ts`.
 
 ## Endpoints
 

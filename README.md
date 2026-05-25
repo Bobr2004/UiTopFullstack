@@ -3,6 +3,20 @@
 > **Note**  
 > Developed by **Bohdan Shovkoplias** for the **UITOP fullstack assignment**.
 
+---
+
+## 🌐 Deployed Links
+
+| Service | URL |
+| :--- | :--- |
+| **Frontend** | [https://ui-top-fullstack-v1wq.vercel.app/](https://ui-top-fullstack-v1wq.vercel.app/) |
+| **Backend API** | [https://ui-top-fullstack-bobr2004s-projects.vercel.app/](https://ui-top-fullstack-bobr2004s-projects.vercel.app/) |
+
+> **Note**: The deployed version lives on the [`deployed-version`](https://github.com/Bobr2004/UiTopFullstack/tree/deployed-version) branch and differs slightly from `main`:
+> - Database uses **Turso** (a hosted SQLite-compatible service) instead of a local SQLite file
+> - Server runs as a **Vercel Serverless Function** via the `api/` directory (not a long-lived Express server)
+> - CORS is configured for the deployed frontend origin
+
 This repository contains a full-stack task manager application styled in a custom, vibrant **Neo-Brutalist** design. The application enables users to manage todos categorized into specific groups (Work, Study, Personal, Home, Other), enforces business constraints on task limits, and features interactive toast notifications with real-time undo-actions.
 
 ---
@@ -14,7 +28,7 @@ The codebase is split into two independent services:
 ### ⚙️ Backend
 * **Runtime**: Node.js & TypeScript
 * **Framework**: Express.js
-* **Database**: SQLite (managed with `better-sqlite3` and configured in WAL mode)
+* **Database**: SQLite via **Turso** (hosted, SQLite-compatible; falls back to local file for development)
 * **ORM**: Drizzle ORM
 * **Validation**: Zod (for query parameters, URL path variables, and body inputs)
 * **Testing**: Vitest (featuring integration tests running against an in-memory SQLite database)

@@ -2,6 +2,12 @@
 
 Next.js App Router frontend for the Todo with Categories project.
 
+## Deployed
+
+```txt
+https://ui-top-fullstack-v1wq.vercel.app/
+```
+
 ## Setup
 
 ```bash
